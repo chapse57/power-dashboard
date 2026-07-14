@@ -9,30 +9,57 @@ const mockData = {
 const COLORS = ["#4F46E5", "#64748B", "#F59E0B", "#10B981", "#94A3B8"];
 
 
+const fuelNames = {
+  fuelPwr1: "수력",
+  fuelPwr2: "유류",
+  fuelPwr3: "유연탄",
+  fuelPwr4: "원자력",
+  fuelPwr5: "양수",
+  fuelPwr6: "가스",
+  fuelPwr7: "국내탄",
+  fuelPwr8: "태양광",
+  fuelPwr9: "풍력",
+  fuelPwr10: "신재생",
+};
+
+
+
 // 키 오면 데이터 모양 확인용 (임시)
 function App() {
   const [power, setPower] = useState(null);
 
   async function testFetch() {
     const key = import.meta.env.VITE_KPX_API_KEY;
-    const url = `/kpx/openapi/sukub5mMaxDatetime/getSukub5mMaxDatetime?serviceKey=${key}`;
+    const parser = new DOMParser();
+  
     try {
-      const res = await fetch(url);
-      const text = await res.text(); // XML이라 일단 text로 받음
-
-      const parser = new DOMParser();
-
-      const xml = parser.parseFromString(text, "text/xml");
-      const currPwr = xml.querySelector("currPwrTot").textContent;
-      const suppReservePwr = xml.querySelector("suppReservePwr").textContent;
-      const suppAbility = xml.querySelector("suppAbility").textContent;
-      const suppReserveRate = xml.querySelector("suppReserveRate").textContent;
-      setPower({
-        currPwr: currPwr,              // 파싱한 변수
-        suppAbility: suppAbility,
-        suppReservePwr: suppReservePwr,
-        suppReserveRate: suppReserveRate,
-      });
+      // ── 현재수급 ──
+      const sukubUrl = `/kpx/openapi/sukub5mMaxDatetime/getSukub5mMaxDatetime?serviceKey=${encodeURIComponent(key)}`;
+      const sukubRes = await fetch(sukubUrl);
+      const sukubText = await sukubRes.text();
+      const sukubXml = parser.parseFromString(sukubText, "text/xml");
+  
+      const currPwr = sukubXml.querySelector("currPwrTot").textContent;
+      const suppReservePwr = sukubXml.querySelector("suppReservePwr").textContent;
+      const suppAbility = sukubXml.querySelector("suppAbility").textContent;
+      const suppReserveRate = sukubXml.querySelector("suppReserveRate").textContent;
+  
+      // ── 발전원별 ──
+      const fuelUrl = `/kpx/openapi/sumperfuel5m/getSumperfuel5m?serviceKey=${encodeURIComponent(key)}`;
+      const fuelRes = await fetch(fuelUrl);
+      const fuelText = await fuelRes.text();
+      const fuelXml = parser.parseFromString(fuelText, "text/xml");
+  
+      const fuelData = [];
+      for (const field in fuelNames) {
+        const name = fuelNames[field];
+        const value = fuelXml.querySelector(field).textContent;
+        fuelData.push({ name: name, value: Number(value) });
+      }
+  
+      // ── 합치기 ──
+      setPower({ currPwr, suppAbility, suppReservePwr, suppReserveRate, fuelData });
+  
     } catch (e) {
       console.error("fetch 에러:", e);
     }
@@ -63,20 +90,19 @@ useEffect(() => {
         <StatBox label="공급예비율" value={power.suppReserveRate} unit="%" />
       </div>
 
-      {/* 도넛차트
       <div style={{ background: "#1E293B", borderRadius: "16px", padding: "24px", maxWidth: "500px" }}>
         <h2 style={{ fontSize: "18px", marginBottom: "16px" }}>발전원별 비중</h2>
         <ResponsiveContainer width="100%" height={300}>
           <PieChart>
             <Pie
-              data={d.발전원별}
+              data={power.fuelData}
               dataKey="value"
               nameKey="name"
               innerRadius={70}
               outerRadius={110}
               paddingAngle={2}
             >
-              {d.발전원별.map((entry, i) => (
+              {power.fuelData.map((entry, i) => (
                 <Cell key={i} fill={COLORS[i % COLORS.length]} />
               ))}
             </Pie>
@@ -84,7 +110,7 @@ useEffect(() => {
             <Legend />
           </PieChart>
         </ResponsiveContainer>
-      </div> */}
+      </div>
     </div>
   );
 }
