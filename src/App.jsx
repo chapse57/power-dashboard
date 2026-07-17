@@ -1,11 +1,6 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { useEffect, useState } from "react";
-const mockData = {
-  currPwrTot: 63213.2,      // 현재수요 (MW)
-  suppReservePwr: 19024.8,  // 공급예비력 (MW)
-  suppAbility: 82238.0,     // 공급능력 (MW)
-  suppReserveRate: 30.096,  // 공급예비율 (%)
-};
+
 const COLORS = ["#4F46E5", "#64748B", "#F59E0B", "#10B981", "#94A3B8"];
 
 
@@ -21,10 +16,24 @@ const fuelNames = {
   fuelPwr9: "풍력",
   fuelPwr10: "신재생",
 };
+// 발전원별 CO2 직접배출 계수 (gCO2/kWh)
+// 화석연료: 황욱 외 2018 (한국 통계 기반, 가스=LNG 복합발전 374, 국내탄=무연탄 1109)
+// 재생·원자력·양수: 직접배출 0 (연소 없음)
+const emissionFactors = {
+  fuelPwr1: 0,     // 수력
+  fuelPwr2: 730,   // 유류 (중유)
+  fuelPwr3: 871,   // 유연탄
+  fuelPwr4: 0,     // 원자력
+  fuelPwr5: 0,     // 양수
+  fuelPwr6: 374,   // 가스 (LNG 복합)
+  fuelPwr7: 1109,  // 국내탄 (무연탄)
+  fuelPwr8: 0,     // 태양광
+  fuelPwr9: 0,     // 풍력
+  fuelPwr10: 0,    // 신재생
+};
 
 
 
-// 키 오면 데이터 모양 확인용 (임시)
 function App() {
 
   const [sukub, setSukub] = useState(null);
@@ -46,6 +55,8 @@ function App() {
     const suppAbility = sukubXml.querySelector("suppAbility").textContent;
     const suppReserveRate = sukubXml.querySelector("suppReserveRate").textContent;
 
+    
+
     setSukub({ currPwr, suppAbility, suppReservePwr, suppReserveRate });
   } catch (e) {
     console.error("현재수급 에러:", e);
@@ -57,12 +68,13 @@ function App() {
     const fuelRes = await fetch(fuelUrl);
     const fuelText = await fuelRes.text();
     const fuelXml = parser.parseFromString(fuelText, "text/xml");
+    
 
     const fuelData = [];
     for (const field in fuelNames) {
       const name = fuelNames[field];
       const value = fuelXml.querySelector(field).textContent;
-      fuelData.push({ name: name, value: Number(value) });
+      fuelData.push({ name: name, value: Number(value),factor: emissionFactors[field]});
     }
 
     setFuel(fuelData);
@@ -71,7 +83,6 @@ function App() {
   }
 }
 
-// 가짜 데이터 (키 오면 진짜로 교체할 자리) - 공식 문서 필드명 기준
 
 useEffect(() => {
   testFetch();
@@ -82,6 +93,12 @@ useEffect(() => {
 if (!sukub && !fuel) {
   return <div style={{ padding: "32px", color: "#fff", background: "#0F172A", minHeight: "100vh" }}>불러오는 중...</div>;
 }
+  // fuel이 있을 때만 계산 (없으면 null)
+  const totalEmission = fuel
+    ? fuel.reduce((sum, item) => sum + item.value * 1000 * item.factor, 0)
+    : null;
+
+
 
 return (
   <div style={{ minHeight: "100vh", background: "#0F172A", color: "#F1F5F9", padding: "32px", fontFamily: "sans-serif" }}>
@@ -95,6 +112,23 @@ return (
         <StatBox label="공급예비력" value={sukub.suppReservePwr} />
         <StatBox label="공급능력" value={sukub.suppAbility} />
         <StatBox label="공급예비율" value={sukub.suppReserveRate} unit="%" />
+      </div>
+    )}
+
+    {/* 실시간 탄소배출 (독립 카드) */}
+    {totalEmission !== null && (
+      <div style={{ background: "#1E293B", borderRadius: "16px", padding: "24px", maxWidth: "500px", marginBottom: "24px" }}>
+        <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>🌍 실시간 탄소배출률</h2>
+        <div style={{ fontSize: "36px", fontWeight: "bold", marginBottom: "12px" }}>
+          {(totalEmission / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 1 })}
+          <span style={{ fontSize: "18px", color: "#94A3B8" }}> tCO₂/h</span>
+        </div>
+        <p style={{ color: "#94A3B8", fontSize: "13px", lineHeight: "1.6", margin: 0 }}>
+          발전원별 출력(MW) × 1,000 × 배출계수(gCO₂/kWh)의 총합.
+          지금 출력이 1시간 유지될 때 나오는 CO₂량입니다.<br />
+          직접배출 기준(재생·원자력·양수 = 0). 화석연료 계수: 황욱 외(2018),
+          가스는 LNG 복합발전, 국내탄은 무연탄 기준.
+        </p>
       </div>
     )}
 
