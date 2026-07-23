@@ -1,8 +1,18 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { useEffect, useState } from "react";
 
-const COLORS = ["#4F46E5", "#64748B", "#F59E0B", "#10B981", "#94A3B8"];
-
+const COLORS = [
+  "#38BDF8", // 수력   - 하늘색 (물)
+  "#F87171", // 유류   - 빨강
+  "#78716C", // 유연탄 - 갈회색 (석탄)
+  "#A78BFA", // 원자력 - 보라
+  "#22D3EE", // 양수   - 청록 (물)
+  "#FB923C", // 가스   - 주황 (불꽃)
+  "#57534E", // 국내탄 - 진갈색 (석탄)
+  "#FACC15", // 태양광 - 노랑 (햇빛)
+  "#4ADE80", // 풍력   - 초록
+  "#2DD4BF", // 신재생 - 민트
+];
 
 const fuelNames = {
   fuelPwr1: "수력",
