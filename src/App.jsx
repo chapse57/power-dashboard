@@ -1,6 +1,9 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { useEffect, useState } from "react";
 
+// 대체 API(발전원별 발전량 계통기준, B552115)의 매핑:
+// fuelPwr1 수력, 2 유류, 3 유연탄, 4 원자력, 5 양수, 6 가스, 7 국내탄, 8 신재생, 9 태양광
+// (기존 openapi.kpx.or.kr과 달리 9개이고 풍력 없음. 8·9 자리가 바뀜)
 const COLORS = [
   "#38BDF8", // 수력   - 하늘색 (물)
   "#F87171", // 유류   - 빨강
@@ -9,9 +12,8 @@ const COLORS = [
   "#22D3EE", // 양수   - 청록 (물)
   "#FB923C", // 가스   - 주황 (불꽃)
   "#57534E", // 국내탄 - 진갈색 (석탄)
-  "#FACC15", // 태양광 - 노랑 (햇빛)
-  "#4ADE80", // 풍력   - 초록
   "#2DD4BF", // 신재생 - 민트
+  "#FACC15", // 태양광 - 노랑 (햇빛)
 ];
 
 const fuelNames = {
@@ -22,9 +24,8 @@ const fuelNames = {
   fuelPwr5: "양수",
   fuelPwr6: "가스",
   fuelPwr7: "국내탄",
-  fuelPwr8: "태양광",
-  fuelPwr9: "풍력",
-  fuelPwr10: "신재생",
+  fuelPwr8: "신재생",
+  fuelPwr9: "태양광",
 };
 // 발전원별 CO2 직접배출 계수 (gCO2/kWh)
 // 화석연료: 황욱 외 2018 (한국 통계 기반, 가스=LNG 복합발전 374, 국내탄=무연탄 1109)
@@ -37,9 +38,8 @@ const emissionFactors = {
   fuelPwr5: 0,     // 양수
   fuelPwr6: 374,   // 가스 (LNG 복합)
   fuelPwr7: 1109,  // 국내탄 (무연탄)
-  fuelPwr8: 0,     // 태양광
-  fuelPwr9: 0,     // 풍력
-  fuelPwr10: 0,    // 신재생
+  fuelPwr8: 0,     // 신재생
+  fuelPwr9: 0,     // 태양광
 };
 
 
@@ -50,12 +50,11 @@ function App() {
   const [fuel , setFuel] = useState(null);
 
   async function testFetch() {
-    const key = import.meta.env.VITE_KPX_API_KEY;
     const parser = new DOMParser();
   
     try {
       // ── 현재수급 ──
-      const sukubUrl = `/kpx/openapi/sukub5mMaxDatetime/getSukub5mMaxDatetime?serviceKey=${encodeURIComponent(key)}`;
+      const sukubUrl = `/api/kpx?path=sukub`;
       const sukubRes = await fetch(sukubUrl);
     const sukubText = await sukubRes.text();
     const sukubXml = parser.parseFromString(sukubText, "text/xml");
@@ -74,11 +73,10 @@ function App() {
 
   // ── 발전원별 (try 2) ──
   try {
-    const fuelUrl = `/kpx/openapi/sumperfuel5m/getSumperfuel5m?serviceKey=${encodeURIComponent(key)}`;
+    const fuelUrl = `/api/kpx?path=fuel`;
     const fuelRes = await fetch(fuelUrl);
     const fuelText = await fuelRes.text();
     const fuelXml = parser.parseFromString(fuelText, "text/xml");
-    
 
     const fuelData = [];
     for (const field in fuelNames) {
